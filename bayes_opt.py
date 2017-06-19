@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.optimize import minimize
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
@@ -19,6 +20,7 @@ class BayesianOptimizer(object):
             'type': 'ucb',
             'u': 0.5  # TODO: this is an arbitrary value
         }
+        self.acquisition = self._ucb
 
     def update(self, features, target):
         self.observations.append([features, target])
@@ -30,10 +32,18 @@ class BayesianOptimizer(object):
         samples = np.random.uniform(
             self.feature_bounds[:, 0],
             self.feature_bounds[:, 1],
-            size=(1000, self.feature_bounds.shape[0]))
-        predictions = self.model.predict(samples)
-        predictions
-        # TODO: Maximize acquisition function and return optimum
+            size=(100, self.feature_bounds.shape[0]))
+        optimum_val = -np.inf
+        for sample in samples:
+            opt_res = minimize(
+                fun=self.acquisition,
+                x0=sample,
+                bounds=self.feature_bounds)
+            if -opt_res.min() >= optimum_val:
+                optimum_val = -opt_res.fun.min()
+                optimum = opt_res.x
+
+        return optimum
 
     def step(self, features, target):
         self.update(features, target)
@@ -42,4 +52,4 @@ class BayesianOptimizer(object):
     def _ucb(self, x):
         u = self.acquisition_params['u']
         mean, std = self.model.predict(x, return_std=True)
-        return mean + u * std
+        return - mean + u * std
