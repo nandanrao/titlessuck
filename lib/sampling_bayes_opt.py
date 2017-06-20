@@ -4,7 +4,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
 
-class SamplingByesianOptimizer(object):
+class SamplingBayesianOptimizer(object):
 
     def __init__(self, feature_samples,
                  init_observations=[],
@@ -14,7 +14,7 @@ class SamplingByesianOptimizer(object):
         # self.feature_bounds = np.stack(feature_meta.values())
         # self.feature_types = [type(f[0]) for f in feature_meta.values()]
         # self.features_dim = len(self.feature_names)
-        self.observations = init_observations
+        self.observations = [init_observations]
         self.i = 0
         self.kernel = kernel
         self.model = GaussianProcessRegressor(kernel=self.kernel)
@@ -33,16 +33,24 @@ class SamplingByesianOptimizer(object):
         return self
 
     def suggest(self, return_dict=False):
+        self.i += 1
+        samples = self.\
+            feature_samples[
+                np.random.randint(self.feature_samples.shape[0], size=100),
+                :]
         optimum_val = -np.inf
-        for sample in self.feature_samples:
+        for sample in samples:
             opt_res = minimize(
                 fun=self.acquisition,
-                x0=sample,
-                bounds=self.feature_bounds)
-            if min(-opt_res.fun) >= optimum_val:
-                optimum_val = min(-opt_res.fun)
+                x0=sample)
+            iter_optimum_val = np.min(-opt_res.fun)
+            if iter_optimum_val >= optimum_val:
+                optimum_val = iter_optimum_val
                 optimum = opt_res.x
 
+        # self.feature_samples = np.stack([r for r
+        #                                  in self.feature_samples
+        #                                  if (r != optimum).any()])
         # optimum = np.maximum(optimum, self.feature_bounds[:, 0])
         # optimum = np.minimum(optimum, self.feature_bounds[:, 1])
         # optimum = [t(optimum[i])
@@ -60,4 +68,5 @@ class SamplingByesianOptimizer(object):
     def _ucb(self, x):
         u = self.acquisition_params['u']
         mean, std = self.model.predict(x.reshape(1, -1), return_std=True)
-        return -(mean + u * std)
+        result = -(mean + u * std).reshape(1)
+        return result
