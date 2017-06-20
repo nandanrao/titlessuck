@@ -15,7 +15,7 @@ class BayesianOptimizer(object):
         self.features_dim = len(self.feature_names)
         self.observations = init_observations
         self.i = 0
-        self.kernel = Matern(nu=.5)
+        self.kernel = kernel
         self.model = GaussianProcessRegressor(kernel=self.kernel)
         self.acquisition_params = {
             'type': 'ucb',
