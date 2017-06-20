@@ -11,6 +11,7 @@ class BayesianOptimizer(object):
                  kernel=Matern(nu=.5)):
         self.feature_names = feature_meta.keys()
         self.feature_bounds = np.stack(feature_meta.values())
+        self.feature_types = [type(f[0]) for f in feature_meta.values()]
         self.features_dim = len(self.feature_names)
         self.observations = init_observations
         self.i = 0
@@ -18,17 +19,19 @@ class BayesianOptimizer(object):
         self.model = GaussianProcessRegressor(kernel=self.kernel)
         self.acquisition_params = {
             'type': 'ucb',
-            'u': 0.5  # TODO: this is an arbitrary value
+            'u': 2.75   # TODO: this is an arbitrary value
         }
         self.acquisition = self._ucb
 
     def update(self, features, target):
-        self.observations.append([features, target])
-        X, y = np.stack(self.observations)
+        self.observations.append(features + [target])
+        data = np.array(self.observations)
+        X = data[:, :-1]
+        y = data[:, -1:]
         self.model.fit(X, y)
         return self
 
-    def suggest(self):
+    def suggest(self, return_dict=False):
         samples = np.random.uniform(
             self.feature_bounds[:, 0],
             self.feature_bounds[:, 1],
@@ -39,11 +42,17 @@ class BayesianOptimizer(object):
                 fun=self.acquisition,
                 x0=sample,
                 bounds=self.feature_bounds)
-            if -opt_res.min() >= optimum_val:
-                optimum_val = -opt_res.fun.min()
+            if min(-opt_res.fun) >= optimum_val:
+                optimum_val = min(-opt_res.fun)
                 optimum = opt_res.x
 
-        return optimum
+        optimum = [t(optimum[i])
+                   for i, t
+                   in enumerate(self.feature_types)]
+        if return_dict is True:
+            return dict(zip(self.feature_names, optimum))
+        else:
+            return optimum
 
     def step(self, features, target):
         self.update(features, target)
@@ -51,5 +60,5 @@ class BayesianOptimizer(object):
 
     def _ucb(self, x):
         u = self.acquisition_params['u']
-        mean, std = self.model.predict(x, return_std=True)
-        return - mean + u * std
+        mean, std = self.model.predict(x.reshape(1, -1), return_std=True)
+        return -(mean + u * std)
