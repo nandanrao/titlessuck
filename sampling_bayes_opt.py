@@ -4,15 +4,16 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 
 
-class BayesianOptimizer(object):
+class SamplingByesianOptimizer(object):
 
-    def __init__(self, feature_meta,
+    def __init__(self, feature_samples,
                  init_observations=[],
                  kernel=Matern(nu=.5)):
-        self.feature_names = feature_meta.keys()
-        self.feature_bounds = np.stack(feature_meta.values())
-        self.feature_types = [type(f[0]) for f in feature_meta.values()]
-        self.features_dim = len(self.feature_names)
+        self.feature_samples = feature_samples
+        # self.feature_names = feature_meta.keys()
+        # self.feature_bounds = np.stack(feature_meta.values())
+        # self.feature_types = [type(f[0]) for f in feature_meta.values()]
+        # self.features_dim = len(self.feature_names)
         self.observations = init_observations
         self.i = 0
         self.kernel = kernel
@@ -32,12 +33,8 @@ class BayesianOptimizer(object):
         return self
 
     def suggest(self, return_dict=False):
-        samples = np.random.uniform(
-            self.feature_bounds[:, 0],
-            self.feature_bounds[:, 1],
-            size=(1000, self.feature_bounds.shape[0]))
         optimum_val = -np.inf
-        for sample in samples:
+        for sample in self.feature_samples:
             opt_res = minimize(
                 fun=self.acquisition,
                 x0=sample,
@@ -46,11 +43,11 @@ class BayesianOptimizer(object):
                 optimum_val = min(-opt_res.fun)
                 optimum = opt_res.x
 
-        optimum = np.maximum(optimum, self.feature_bounds[:, 0])
-        optimum = np.minimum(optimum, self.feature_bounds[:, 1])
-        optimum = [t(optimum[i])
-                   for i, t
-                   in enumerate(self.feature_types)]
+        # optimum = np.maximum(optimum, self.feature_bounds[:, 0])
+        # optimum = np.minimum(optimum, self.feature_bounds[:, 1])
+        # optimum = [t(optimum[i])
+        #            for i, t
+        #            in enumerate(self.feature_types)]
         if return_dict is True:
             return dict(zip(self.feature_names, optimum))
         else:
